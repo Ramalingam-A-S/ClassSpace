@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+infra/node_modules/
+
+# Build & CDK temporary outputs
+dist/
+infra/dist/
+cdk.out/
+infra/cdk.out/
+coverage/
+*.tsbuildinfo
+
+# Environment & Secret files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Credentials, certificates, & AWS profile exports
+.aws/
+*credentials*
+*aws-profile*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+
+# Local databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
