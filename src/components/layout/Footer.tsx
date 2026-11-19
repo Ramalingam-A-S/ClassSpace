@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
+import { AppModeContext } from '../../hooks/useAppMode';
 import { Logo } from './Logo';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { classSpaceService } from '../../services';
 
 export function Footer({ onDemoReset }: { onDemoReset?: () => void }) {
+  const appMode = useContext(AppModeContext);
+  const isLiveMode = appMode?.mode === 'LIVE';
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -67,23 +70,26 @@ export function Footer({ onDemoReset }: { onDemoReset?: () => void }) {
 
           <div>
             <h2 className="text-xs font-semibold tracking-wider text-slate-900 uppercase">
-              Demo Environment Controls
+              {isLiveMode ? 'Live AWS Environment' : 'Demo Environment Controls'}
             </h2>
             <p className="mt-3 text-xs leading-relaxed text-slate-600">
-              All data is fictional demonstration data persisted locally in your browser. Not
-              connected to verified institutional systems or real-time room sensors.
+              {isLiveMode
+                ? 'Connected to ClassSpace AWS serverless backend (API Gateway + Lambda + DynamoDB + Cognito PKCE). Availability reflects scheduled records only.'
+                : 'All data is fictional demonstration data persisted locally in your browser. Not connected to verified institutional systems or real-time room sensors.'}
             </p>
-            <div className="mt-3">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setConfirmOpen(true)}
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                Reset Demo Data
-              </Button>
-            </div>
+            {!isLiveMode && (
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Reset Demo Data
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

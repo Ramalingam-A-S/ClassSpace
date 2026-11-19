@@ -1,7 +1,26 @@
-import { AlertCircle, FlaskConical, Info, SearchX } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { AlertCircle, Cloud, FlaskConical, Info, SearchX } from 'lucide-react';
+import { useContext, type ReactNode } from 'react';
+import { AppModeContext } from '../../hooks/useAppMode';
 
 export function DemoDisclosureBanner({ compact = false }: { compact?: boolean }) {
+  const appMode = useContext(AppModeContext);
+  if (appMode?.mode === 'LIVE') {
+    return (
+      <div
+        className={`flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-950 ${
+          compact ? 'px-3.5 py-2.5 text-xs' : 'p-4 text-sm'
+        }`}
+      >
+        <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
+        <p className="leading-relaxed">
+          <strong className="font-semibold">Live AWS Mode:</strong> Requests authenticate with
+          Amazon Cognito PKCE and persist atomically to Amazon DynamoDB via AWS Lambda. Schedule
+          entries reflect admin-entered data only; physical occupancy is not monitored.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 text-violet-950 ${

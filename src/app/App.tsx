@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import { AppModeProvider } from './AppModeProvider';
 import { DemoRoleProvider } from './DemoRoleProvider';
 import { AppShell } from '../components/layout/AppShell';
 import { LandingPage } from '../pages/LandingPage';
@@ -9,6 +10,7 @@ import { MyBookingsPage } from '../pages/MyBookingsPage';
 import { AdminDashboardPage } from '../pages/AdminDashboardPage';
 import { AdminRoomsPage } from '../pages/AdminRoomsPage';
 import { AdminTimetablePage } from '../pages/AdminTimetablePage';
+import { AuthCallbackPage } from '../pages/AuthCallbackPage';
 
 function NotFoundPage() {
   return (
@@ -40,6 +42,7 @@ export function AppRoutes({ onDemoReset }: { onDemoReset: () => void }) {
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/admin/rooms" element={<AdminRoomsPage />} />
         <Route path="/admin/timetable" element={<AdminTimetablePage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
@@ -50,11 +53,13 @@ export function App() {
   const [resetEpoch, setResetEpoch] = useState(0);
 
   return (
-    <DemoRoleProvider>
-      <BrowserRouter>
-        <AppRoutes key={resetEpoch} onDemoReset={() => setResetEpoch((n) => n + 1)} />
-      </BrowserRouter>
-    </DemoRoleProvider>
+    <AppModeProvider>
+      <DemoRoleProvider>
+        <BrowserRouter>
+          <AppRoutes key={resetEpoch} onDemoReset={() => setResetEpoch((n) => n + 1)} />
+        </BrowserRouter>
+      </DemoRoleProvider>
+    </AppModeProvider>
   );
 }
 
