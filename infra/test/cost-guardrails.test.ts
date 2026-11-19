@@ -35,12 +35,14 @@ describe('ClassSpace Cost Guardrail Tests', () => {
   });
 
   test('21. CloudWatch log group retention is explicitly 7 days with no custom KMS key', () => {
-    template.resourceCountIs('AWS::Logs::LogGroup', 1);
-    template.hasResourceProperties('AWS::Logs::LogGroup', {
-      LogGroupName: '/aws/lambda/classspace-dev-api',
-      RetentionInDays: 7,
-      KmsKeyId: Match.absent(),
-    });
+    template.resourceCountIs('AWS::Logs::LogGroup', 4);
+    for (const suffix of ['rooms', 'availability', 'bookings', 'schedules']) {
+      template.hasResourceProperties('AWS::Logs::LogGroup', {
+        LogGroupName: `/aws/lambda/classspace-dev-api-${suffix}`,
+        RetentionInDays: 7,
+        KmsKeyId: Match.absent(),
+      });
+    }
     template.resourceCountIs('AWS::KMS::Key', 0);
   });
 
@@ -73,10 +75,12 @@ describe('ClassSpace Cost Guardrail Tests', () => {
       });
     }
 
-    template.hasResourceProperties('AWS::Lambda::Function', {
-      FunctionName: 'classspace-dev-api',
-      Tags: Match.arrayWith(expectedTags),
-    });
+    for (const suffix of ['rooms', 'availability', 'bookings', 'schedules']) {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: `classspace-dev-api-${suffix}`,
+        Tags: Match.arrayWith(expectedTags),
+      });
+    }
 
     template.hasResourceProperties('AWS::Cognito::UserPool', {
       UserPoolName: 'classspace-dev-users',

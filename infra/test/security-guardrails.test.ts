@@ -133,16 +133,21 @@ describe('ClassSpace Security Guardrail Tests', () => {
       'GET /rooms/available': ['classspace/read'],
       'GET /rooms/{roomId}': ['classspace/read'],
       'GET /bookings/me': ['classspace/read'],
+      'GET /bookings/{id}': ['classspace/read'],
       'POST /bookings': ['classspace/bookings/write'],
+      'PATCH /bookings/{id}/cancel': ['classspace/bookings/write'],
       'PATCH /admin/bookings/{id}': ['classspace/admin'],
+      'GET /admin/bookings': ['classspace/admin'],
       'POST /admin/rooms': ['classspace/admin'],
       'PATCH /admin/rooms/{id}': ['classspace/admin'],
       'PUT /admin/timetable': ['classspace/admin'],
       'POST /admin/restrictions': ['classspace/admin'],
+      'GET /admin/schedules': ['classspace/admin'],
+      'DELETE /admin/schedules': ['classspace/admin'],
     };
 
     const routes = template.findResources('AWS::ApiGatewayV2::Route');
-    expect(Object.keys(routes)).toHaveLength(10);
+    expect(Object.keys(routes)).toHaveLength(15);
 
     const observedRouteKeys: string[] = [];
     for (const route of Object.values(routes)) {
@@ -242,10 +247,16 @@ describe('ClassSpace Security Guardrail Tests', () => {
     const conditionCheckSids = [...statementsBySid.entries()]
       .filter(([, value]) => value.actions.includes('dynamodb:ConditionCheckItem'))
       .map(([sid]) => sid);
-    expect(conditionCheckSids).toEqual(['RoomsTableReadWriteAndConditionCheck']);
+    expect(conditionCheckSids).toEqual(['RoomsTableReadAndConditionCheck']);
 
-    // Verify GSI access is Query-only
-    expect(statementsBySid.get('ScopedGsiQueryOnlyAccess')?.actions).toEqual(['dynamodb:Query']);
+    // Verify all GSI statements have Query-only access
+    const gsiStatements = [...statementsBySid.entries()].filter(([sid]) =>
+      sid.toLowerCase().includes('gsi'),
+    );
+    expect(gsiStatements.length).toBeGreaterThan(0);
+    for (const [, stmt] of gsiStatements) {
+      expect(stmt.actions).toEqual(['dynamodb:Query']);
+    }
   });
 
   test('27. No secrets are embedded in frontend .env.example or Lambda environment config', () => {

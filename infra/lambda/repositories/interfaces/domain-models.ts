@@ -11,10 +11,12 @@ export interface RoomRecord {
   readonly blockId: string;
   readonly floor: number;
   readonly roomNumber: string;
+  readonly roomName: string;
   readonly capacity: number;
   readonly facilities: readonly string[];
   readonly active: boolean;
   readonly dataSource: DataSource;
+  readonly createdAt: string;
   readonly updatedAt: string;
 }
 
@@ -27,6 +29,8 @@ export interface ScheduleRecord {
   readonly endTime: string; // HH:mm
   readonly label: string; // subject for TIMETABLE, reason for RESTRICTION
   readonly dataSource: DataSource;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
 }
 
 export interface BookingRecord {
@@ -39,6 +43,7 @@ export interface BookingRecord {
   readonly startTime: string; // HH:mm
   readonly endTime: string; // HH:mm
   readonly status: BookingStatus;
+  readonly idempotencyKey?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly dataSource: DataSource;

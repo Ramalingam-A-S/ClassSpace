@@ -70,16 +70,18 @@ describe('ClassSpace Infrastructure Template Tests', () => {
     });
   });
 
-  test('12-16. Lambda uses Node.js 22.x, ARM64, <=256 MB, <=10s timeout, and no VPC', () => {
-    template.resourceCountIs('AWS::Lambda::Function', 1);
-    template.hasResourceProperties('AWS::Lambda::Function', {
-      FunctionName: 'classspace-dev-api',
-      Runtime: 'nodejs22.x',
-      Architectures: ['arm64'],
-      MemorySize: 256,
-      Timeout: 10,
-      VpcConfig: Match.absent(),
-    });
+  test('12-16. Modular domain Lambdas use Node.js 22.x, ARM64, <=256 MB, <=10s timeout, and no VPC', () => {
+    template.resourceCountIs('AWS::Lambda::Function', 4);
+    for (const suffix of ['rooms', 'availability', 'bookings', 'schedules']) {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: `classspace-dev-api-${suffix}`,
+        Runtime: 'nodejs22.x',
+        Architectures: ['arm64'],
+        MemorySize: 256,
+        Timeout: 10,
+        VpcConfig: Match.absent(),
+      });
+    }
   });
 
   test('18 & 20. API Gateway is HTTP API with all 10 planned routes and stage throttling', () => {
@@ -105,11 +107,16 @@ describe('ClassSpace Infrastructure Template Tests', () => {
       'GET /rooms/{roomId}',
       'POST /bookings',
       'GET /bookings/me',
+      'GET /bookings/{id}',
+      'PATCH /bookings/{id}/cancel',
       'PATCH /admin/bookings/{id}',
+      'GET /admin/bookings',
       'POST /admin/rooms',
       'PATCH /admin/rooms/{id}',
       'PUT /admin/timetable',
       'POST /admin/restrictions',
+      'GET /admin/schedules',
+      'DELETE /admin/schedules',
     ];
 
     for (const routeKey of expectedRoutes) {

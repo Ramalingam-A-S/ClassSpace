@@ -28,7 +28,7 @@ export class ClassSpaceStack extends cdk.Stack {
       config,
       database: this.database,
       authentication: this.authentication,
-      lambdaLogGroup: this.monitoring.lambdaLogGroup,
+      domainLogGroups: this.monitoring.domainLogGroups,
     });
 
     // Apply standard resource tags across all taggable resources in the stack

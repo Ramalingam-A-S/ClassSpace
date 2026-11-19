@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const SLOT_MINUTES = 15;
+export const MAX_BOOKING_MINUTES = 4 * 60;
+export const MAX_SCHEDULE_ENTRY_MINUTES = 8 * 60;
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{2,64}$/;

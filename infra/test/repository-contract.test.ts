@@ -16,10 +16,12 @@ describe('Repository Contract, In-Memory Isolation & DynamoDB Boundary Tests', (
       blockId: 'BLOCK-A',
       floor: 2,
       roomNumber: 'ECE-201',
+      roomName: 'ECE Seminar 201',
       capacity: 60,
       facilities: ['Projector'],
       active: true,
       dataSource: 'DEMO',
+      createdAt: '2026-11-19T10:00:00Z',
       updatedAt: '2026-11-19T10:00:00Z',
     });
 
@@ -33,10 +35,12 @@ describe('Repository Contract, In-Memory Isolation & DynamoDB Boundary Tests', (
         blockId: 'BLOCK-A',
         floor: 2,
         roomNumber: 'ECE-201',
+        roomName: 'ECE Seminar 201',
         capacity: 60,
         facilities: ['Projector'],
         active: true,
         dataSource: 'DEMO',
+        createdAt: '2026-11-19T10:00:00Z',
         updatedAt: '2026-11-19T10:00:00Z',
       }),
     ).rejects.toThrow(ApiError);
@@ -147,7 +151,11 @@ describe('Repository Contract, In-Memory Isolation & DynamoDB Boundary Tests', (
       buildSlotLockKeys('room-ece-201', '2026-11-19', '10:00', '10:15', 'BOOKING')[0],
     );
 
-    // Deferred transactional writes explicitly throw 503 SERVICE_UNAVAILABLE in Phase 2.3.1
-    await expect(dbCtx.slotLocks.claimSlots({ locks: [] })).rejects.toThrow(ApiError);
+    // Empty claimSlots is a safe no-op without unnecessary DynamoDB network calls
+    await expect(dbCtx.slotLocks.claimSlots({ locks: [] })).resolves.toEqual({
+      acquired: true,
+      conflictingLockKeys: [],
+    });
+    expect(fakeClient.send).not.toHaveBeenCalled();
   });
 });

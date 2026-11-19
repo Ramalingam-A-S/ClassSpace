@@ -10,7 +10,14 @@ import type {
   ScheduleRecordType,
   SlotLockRecord,
 } from '../interfaces/domain-models';
-import type { RepositoryContext } from '../interfaces/repository-context';
+import type {
+  AtomicApproveBookingInput,
+  AtomicCancelApprovedBookingInput,
+  AtomicDeleteScheduleInput,
+  AtomicOperations,
+  AtomicUpsertScheduleInput,
+  RepositoryContext,
+} from '../interfaces/repository-context';
 import type { ListByBlockOptions, RoomRepository } from '../interfaces/room.repository';
 import type { ScheduleRepository } from '../interfaces/schedule.repository';
 import type {
@@ -29,7 +36,9 @@ function paginateArray<T>(
   options?: PaginationOptions,
 ): PaginatedResult<T> {
   const limit = options?.limit ?? 25;
-  const offset = options?.nextToken ? Number(Buffer.from(options.nextToken, 'base64url').toString('utf8')) : 0;
+  const offset = options?.nextToken
+    ? Number(Buffer.from(options.nextToken, 'base64url').toString('utf8'))
+    : 0;
   const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
   const slice = items.slice(safeOffset, safeOffset + limit);
   const nextOffset = safeOffset + limit;
@@ -44,8 +53,9 @@ function paginateArray<T>(
 
 /**
  * Creates an isolated in-memory RepositoryContext for unit tests.
- * Note: Enforces basic PK uniqueness and conditional preconditions in memory,
- * but does NOT prove DynamoDB TransactWriteItems concurrency correctness.
+ * Note: Enforces PK uniqueness and preconditions in memory,
+ * and sets supportsAtomicTransactions=false because JS maps do NOT prove
+ * DynamoDB TransactWriteItems distributed concurrency correctness.
  */
 export function createInMemoryRepositoryContext(): InMemoryRepositoryContext {
   const rooms = new Map<string, RoomRecord>();
@@ -97,6 +107,14 @@ export function createInMemoryRepositoryContext(): InMemoryRepositoryContext {
       const existing = rooms.get(roomId);
       if (!existing) {
         throw notFoundError(`Room "${roomId}" was not found.`);
+      }
+      const nextBlock = patch.blockId ?? existing.blockId;
+      const nextNumber = patch.roomNumber ?? existing.roomNumber;
+      const duplicateBlockRoom = [...rooms.values()].some(
+        (r) => r.roomId !== roomId && r.blockId === nextBlock && r.roomNumber === nextNumber,
+      );
+      if (duplicateBlockRoom) {
+        throw conflictError(`Room "${nextBlock} / ${nextNumber}" already exists.`);
       }
       const updated: RoomRecord = { ...existing, ...patch, roomId };
       rooms.set(roomId, updated);
@@ -209,14 +227,10 @@ export function createInMemoryRepositoryContext(): InMemoryRepositoryContext {
       return found;
     },
     async claimSlots(input: ClaimSlotsInput): Promise<SlotClaimResult> {
-      const conflicts = input.locks
-        .map((l) => l.lockKey)
-        .filter((key) => slotLocks.has(key));
-
+      const conflicts = input.locks.map((l) => l.lockKey).filter((key) => slotLocks.has(key));
       if (conflicts.length > 0) {
         return { acquired: false, conflictingLockKeys: conflicts };
       }
-
       for (const lock of input.locks) {
         slotLocks.set(lock.lockKey, lock);
       }
@@ -236,11 +250,146 @@ export function createInMemoryRepositoryContext(): InMemoryRepositoryContext {
     },
   };
 
+  const atomic: AtomicOperations = {
+    async approveBooking(input: AtomicApproveBookingInput): Promise<BookingRecord> {
+      const room = rooms.get(input.booking.roomId);
+      if (!room || !room.active) {
+        throw conflictError(`Room "${input.booking.roomId}" is missing or inactive.`);
+      }
+      const current = bookings.get(input.booking.bookingId);
+      if (!current || current.status !== 'PENDING') {
+        throw conflictError(
+          `Booking "${input.booking.bookingId}" is not in PENDING status.`,
+        );
+      }
+      const conflicting = input.slotLocks
+        .map((l) => l.lockKey)
+        .filter((k) => slotLocks.has(k));
+      if (conflicting.length > 0) {
+        throw conflictError(
+          `Booking "${input.booking.bookingId}" overlaps existing slot locks.`,
+          { conflictingLockKeys: conflicting },
+        );
+      }
+      for (const lock of input.slotLocks) {
+        slotLocks.set(lock.lockKey, lock);
+      }
+      const updated: BookingRecord = {
+        ...current,
+        status: 'APPROVED',
+        updatedAt: input.updatedAt,
+      };
+      bookings.set(input.booking.bookingId, updated);
+      return updated;
+    },
+
+    async cancelApprovedBooking(
+      input: AtomicCancelApprovedBookingInput,
+    ): Promise<BookingRecord> {
+      const current = bookings.get(input.booking.bookingId);
+      if (!current || current.status !== 'APPROVED') {
+        throw conflictError(`Booking "${input.booking.bookingId}" is not APPROVED.`);
+      }
+      for (const lockKey of input.lockKeys) {
+        const existingLock = slotLocks.get(lockKey);
+        if (
+          !existingLock ||
+          existingLock.claimType !== 'BOOKING' ||
+          existingLock.claimRefId !== input.booking.bookingId
+        ) {
+          throw conflictError(
+            `Cannot release lock "${lockKey}" not owned by booking "${input.booking.bookingId}".`,
+          );
+        }
+      }
+      for (const lockKey of input.lockKeys) {
+        slotLocks.delete(lockKey);
+      }
+      const updated: BookingRecord = {
+        ...current,
+        status: 'CANCELLED',
+        updatedAt: input.updatedAt,
+      };
+      bookings.set(input.booking.bookingId, updated);
+      return updated;
+    },
+
+    async upsertScheduleWithLocks(input: AtomicUpsertScheduleInput): Promise<ScheduleRecord> {
+      const room = rooms.get(input.record.roomId);
+      if (!room) {
+        throw conflictError(`Room "${input.record.roomId}" does not exist.`);
+      }
+      const key = scheduleMapKey(
+        input.record.roomId,
+        input.record.date,
+        input.record.recordType,
+        input.record.scheduleId,
+      );
+      if (!input.previousRecord && schedules.has(key)) {
+        throw conflictError(`Schedule "${input.record.scheduleId}" already exists.`);
+      }
+      if (input.previousRecord && !schedules.has(key)) {
+        throw conflictError(`Schedule "${input.record.scheduleId}" does not exist.`);
+      }
+      const claimType = input.record.recordType === 'TIMETABLE' ? 'TIMETABLE' : 'RESTRICTION';
+      for (const lockKey of input.lockKeysToDelete) {
+        const existingLock = slotLocks.get(lockKey);
+        if (
+          !existingLock ||
+          existingLock.claimType !== claimType ||
+          existingLock.claimRefId !== input.record.scheduleId
+        ) {
+          throw conflictError(`Lock "${lockKey}" is not owned by schedule "${input.record.scheduleId}".`);
+        }
+      }
+      const conflicting = input.locksToInsert
+        .map((l) => l.lockKey)
+        .filter((k) => slotLocks.has(k));
+      if (conflicting.length > 0) {
+        throw conflictError(`Schedule "${input.record.scheduleId}" conflicts with existing locks.`, {
+          conflictingLockKeys: conflicting,
+        });
+      }
+
+      for (const lockKey of input.lockKeysToDelete) {
+        slotLocks.delete(lockKey);
+      }
+      for (const lock of input.locksToInsert) {
+        slotLocks.set(lock.lockKey, lock);
+      }
+      schedules.set(key, input.record);
+      return input.record;
+    },
+
+    async deleteScheduleWithLocks(input: AtomicDeleteScheduleInput): Promise<void> {
+      const key = scheduleMapKey(input.roomId, input.date, input.recordType, input.scheduleId);
+      if (!schedules.has(key)) {
+        throw conflictError(`Schedule "${input.scheduleId}" does not exist.`);
+      }
+      const claimType = input.recordType === 'TIMETABLE' ? 'TIMETABLE' : 'RESTRICTION';
+      for (const lockKey of input.lockKeys) {
+        const existingLock = slotLocks.get(lockKey);
+        if (
+          !existingLock ||
+          existingLock.claimType !== claimType ||
+          existingLock.claimRefId !== input.scheduleId
+        ) {
+          throw conflictError(`Lock "${lockKey}" is not owned by schedule "${input.scheduleId}".`);
+        }
+      }
+      for (const lockKey of input.lockKeys) {
+        slotLocks.delete(lockKey);
+      }
+      schedules.delete(key);
+    },
+  };
+
   return {
     rooms: roomRepo,
     schedules: scheduleRepo,
     bookings: bookingRepo,
     slotLocks: slotLockRepo,
+    atomic,
     supportsAtomicTransactions: false,
     clear() {
       rooms.clear();

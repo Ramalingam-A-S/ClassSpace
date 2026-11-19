@@ -12,6 +12,10 @@ export interface UpdateBookingStatusInput {
   readonly updatedAt: string;
 }
 
+export interface ListAllBookingsOptions extends PaginationOptions {
+  readonly status?: BookingStatus;
+}
+
 export interface BookingRepository {
   getById(bookingId: string): Promise<BookingRecord | null>;
   listByStudent(
@@ -28,6 +32,7 @@ export interface BookingRepository {
     date: string,
     statusFilter?: BookingStatus,
   ): Promise<readonly BookingRecord[]>;
+  listByStatus?(options?: ListAllBookingsOptions): Promise<PaginatedResult<BookingRecord>>;
   create(booking: BookingRecord): Promise<BookingRecord>;
   updateStatus(input: UpdateBookingStatusInput): Promise<BookingRecord>;
 }
