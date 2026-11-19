@@ -1,95 +1,65 @@
-# ClassSpace — Campus Classroom Availability Discovery (Phase 1)
+# ClassSpace — Smart Free Classroom Finder
 
-ClassSpace helps college students discover **schedule-vacant** classrooms during their free periods and provides administrators with tools to manage rooms, timetables, restrictions, and booking approvals.
+ClassSpace helps college students discover **schedule-vacant** classrooms during their free periods and equips administrators to manage rooms, timetables, maintenance/exam restrictions, and booking approvals with atomic slot-lock concurrency control.
 
-> **Important Disclosure (Phase 1 Demo Mode):**
-> All classrooms, schedules, bookings, and restrictions in Phase 1 are fictional **DEMO** records. ClassSpace evaluates **schedule availability only** and **never claims real-time physical occupancy verification**.
+Built for the **AWS ShipIt Challenge 2026 (Techfest IIT Bombay)** targeting `ap-south-1` (Mumbai) with `Asia/Kolkata` campus time semantics and strict ₹0-waste Free-Tier / credit-safe serverless architecture.
 
----
-
-## Technology Stack
-
-- **Frontend:** React 19, TypeScript (strict mode), Vite, Tailwind CSS v4, React Router
-- **Forms & Validation:** React Hook Form, Zod (`@hookform/resolvers`)
-- **Icons:** Lucide React
-- **Testing & Quality:** Vitest, React Testing Library, ESLint, TypeScript (`tsc`)
+> **Honest Scope Disclosures:**
+> - **Schedule Status Only:** `SCHEDULE_VACANT` confirms there is no overlapping scheduled class, approved booking, or restriction. It **does not verify physical room occupancy** (no IoT sensors or CCTV feeds).
+> - **Institutional Data:** Seed datasets represent fictional `DEMO` / `ADMIN_ENTERED` records; no university ERP timetable feed is connected.
+> - **Deployment Status:** All frontend, backend Lambda handlers, CDK infrastructure, security guardrails, concurrency tests, and CloudFormation synthesis (`cdk synth --no-lookups`) are verified locally. Cloud deployment awaits user AWS account credentials and Free Plan / credit confirmation (see [DEPLOYMENT.md](DEPLOYMENT.md) and [infra/DEPLOYMENT_BLOCKERS.md](infra/DEPLOYMENT_BLOCKERS.md)).
 
 ---
 
-## Prerequisites
+## Architecture Highlights
 
-- **Node.js:** v20+ or v22+ (verified on Node v22.20.0)
-- **npm:** v10+
+- **Frontend (`src/`):** React 19, TypeScript (strict), Vite, Tailwind CSS v4, React Router, React Hook Form, Zod, Vitest.
+  - **Phase 1 Demo Mode:** Preserved intact using `MockClassSpaceService` + `LocalMockRepository` (`localStorage`) + Client-side Demo Role Switcher.
+  - **Phase 2 Live AWS Mode:** `AwsClassSpaceService` + Amazon Cognito Authorization Code + PKCE (`S256`) (`src/services/cognitoAuth.ts`) storing tokens strictly in JS memory, transmitting `Bearer` access tokens + `Idempotency-Key`.
+- **Backend & IaC (`infra/`):** AWS CDK v2 (TypeScript), 4 modular Node.js 22.x `ARM64` Lambda functions (`rooms`, `availability`, `bookings`, `schedules`), API Gateway HTTP API v2 (`10 req/s`, `20` burst) with JWT Authorizer + 3 custom OAuth scopes (`classspace/read`, `classspace/bookings/write`, `classspace/admin`), Cognito User Pool (`LITE` tier, `student`/`admin` groups, zero SMS MFA), and 4 `PAY_PER_REQUEST` DynamoDB tables (`ClassSpaceRooms`, `ClassSpaceSchedules`, `ClassSpaceBookings`, `ClassSpaceSlotLocks`).
 
 ---
 
-## Installation & Running Locally
+## Quick Start (Local Demo Mode — ₹0 Cost)
 
-```bash
-# 1. Install dependencies
+```powershell
+# 1. Install frontend dependencies and start dev server
 npm install
-
-# 2. Start the local development server
 npm run dev
 ```
 
-Open the local URL printed by Vite (typically `http://localhost:5173`).
+Open `http://localhost:5173`. Demo Mode runs immediately in your browser using simulated campus data (`Asia/Kolkata`).
 
 ---
 
 ## Verification Commands
 
-```bash
-# TypeScript strict type checking
+```powershell
+# Frontend typecheck, lint, unit/UI tests, and production bundle
 npm run typecheck
-
-# ESLint check
 npm run lint
-
-# Automated unit and UI integration tests (Vitest + React Testing Library)
 npm test
-
-# Production build
 npm run build
+
+# Backend CDK + Lambda compilation, unit/concurrency/guardrail tests, and CloudFormation synthesis
+cd infra
+npm install
+npm run build
+npm test
+npx cdk synth --no-lookups
 ```
 
 ---
 
-## Demo Mode Explanation
+## Project Documentation
 
-- **Explicit Demo Mode Indicator:** A persistent top banner identifies `DEMO MODE` and the active demo persona.
-- **Role Switcher:** Use the `Demo Role` selector in the navigation bar to switch between **Student Demo** (`Aarav Nair`) and **Admin Demo** (`Dr. Kavitha Rao`). This is a Phase 1 UI simulation, not real authentication.
-- **Local Persistence:** Changes (booking requests, approvals, new rooms, timetable edits, restrictions) persist across browser refreshes via `localStorage` (`LocalMockRepository`). Use **Reset Demo Data** in the footer at any time to restore the initial seed dataset.
-- **Campus Timezone:** All dates and times use `Asia/Kolkata` (IST).
-
----
-
-## Key Features
-
-- **Availability Engine (`src/services/availabilityEngine.ts`):**
-  - Distinguishes `SCHEDULE_VACANT`, `OCCUPIED_TIMETABLE`, `OCCUPIED_BOOKING`, `RESTRICTED`, `INACTIVE`, and `INSUFFICIENT_CAPACITY`.
-  - Uses strict half-open interval overlap (`requestedStart < existingEnd && requestedEnd > existingStart`), allowing adjacent slots (`10:00–11:00` and `11:00–12:00`).
-  - Pending requests never block availability until approved by an administrator.
-- **Student Views:** Landing Page (`/`), Student Dashboard (`/student`), Room Details (`/rooms/:roomId`), My Bookings (`/bookings`).
-- **Admin Views:** Admin Dashboard (`/admin`), Room Management (`/admin/rooms`), Timetable & Restrictions (`/admin/timetable`).
-
----
-
-## Known Limitations
-
-- Single academic block (`BLOCK-A`) demonstration dataset only.
-- No institutional timetable feed connection yet.
-- No physical room occupancy sensors; schedule-vacant rooms may still be occupied by unscheduled users.
-- Data is stored per-browser in `localStorage` rather than a centralized server database.
-
----
-
-## Future AWS Architecture (Phase 2)
-
-All UI views communicate with `IClassSpaceService` (`src/services/contracts.ts`). In Phase 2:
-- **Authentication:** Amazon Cognito (User Pool + `student` / `admin` groups).
-- **API Layer:** Amazon API Gateway + AWS Lambda enforcing JWT authorization and server-side conflict checks.
-- **Database:** Amazon DynamoDB or Amazon Aurora PostgreSQL (see [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) and [docs/API_CONTRACT.md](docs/API_CONTRACT.md)).
-- **Hosting:** Amazon S3 + Amazon CloudFront (or AWS Amplify Hosting).
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/PHASE1_REPORT.md](docs/PHASE1_REPORT.md) for full details.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — End-to-end architecture & Mermaid diagram
+- [SECURITY.md](SECURITY.md) — Cognito PKCE, OAuth scopes, `requireAdmin`, and least-privilege IAM
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Pre-flight cost checks, `cdk bootstrap`, `cdk deploy`, Cognito seeding, and `cdk destroy`
+- [COST_ESTIMATE.md](COST_ESTIMATE.md) — Free-Tier / credit optimization and cost guardrails
+- [API_REFERENCE.md](API_REFERENCE.md) — All 15 scoped HTTP API v2 endpoints & contracts
+- [DATA_MODEL.md](DATA_MODEL.md) — DynamoDB 4-table + GSI + 15-min `SlotLocks` transaction design
+- [DEMO_SCRIPT.md](DEMO_SCRIPT.md) — 60–90s hackathon demo video script & screenshot checklist
+- [FINAL_QA_REPORT.md](FINAL_QA_REPORT.md) — Verified test, build, lint, synth, and secret scan results
+- [FINAL_SUBMISSION_CHECKLIST.md](FINAL_SUBMISSION_CHECKLIST.md) — AWS ShipIt Challenge 2026 & CA Portal submission pack
+- [FINAL_PROJECT_COMPLETION_REPORT.md](FINAL_PROJECT_COMPLETION_REPORT.md) — Honest status matrix and open blockers
