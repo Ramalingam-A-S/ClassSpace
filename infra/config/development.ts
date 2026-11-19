@@ -24,7 +24,7 @@ export const DEVELOPMENT_CONFIG: ClassSpaceEnvironmentConfig = {
   projectName: 'ClassSpace',
   environmentName: 'Development',
   ownerTag: 'StudentProject',
-  region: 'ap-south-1',
+  region: 'ap-southeast-2',
   stackName: 'ClassSpaceDevelopmentStack',
   campusTimezone: 'Asia/Kolkata',
   userPoolName: 'classspace-dev-users',
